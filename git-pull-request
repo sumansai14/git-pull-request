@@ -1,0 +1,25 @@
+#! /usr/bin/python
+
+import sys
+import os
+import getpass
+import pycurl
+import simplejson
+from git import InvalidGitRepositoryError, Repo
+
+if __name__ == '__main__':
+    try:
+        repository = Repo(os.getcwd())
+    except InvalidGitRepositoryError:
+        raise SystemExit("This is not a valid git repository")
+    remotes = repository.remotes
+    remotes_names = [remote.name for remote in remotes]
+    remote_upstream = sys.argv[1]
+    remote_origin = sys.argv[2]
+    connection = pycurl.Curl()
+    connection.setopt(pycurl.URL, 'https://api.github')
+    print remote_upstream + ' ' + remote_origin
+    if remote_upstream in remotes_names and remote_origin in remotes_names:
+        username = raw_input('Username: ')
+        password = getpass.getpass()
+        print username + ' ' + password
