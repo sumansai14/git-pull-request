@@ -4,22 +4,57 @@ import sys
 import os
 import getpass
 import pycurl
+from io import BytesIO
 import simplejson
-from git import InvalidGitRepositoryError, Repo
+from pygit2 import Repository
 
 if __name__ == '__main__':
     try:
-        repository = Repo(os.getcwd())
-    except InvalidGitRepositoryError:
+        repository = Repository(os.getcwd())
+    except KeyError:
         raise SystemExit("This is not a valid git repository")
+    response_buffer = BytesIO()
     remotes = repository.remotes
     remotes_names = [remote.name for remote in remotes]
-    remote_upstream = sys.argv[1]
-    remote_origin = sys.argv[2]
+    remote_upstream = sys.argv[1].split('/')[0]
+    remote_upstream_base = sys.argv[1].split('/')[1]
+    remote_origin = sys.argv[2].split('/')[0]
+    remote_origin_branch = sys.argv[2].split('/')[1]
+    for remote in remotes:
+        if remote.name == remote_upstream:
+            remote_upstream_instance = remote
+        else:
+            remote_origin_instance = remote
     connection = pycurl.Curl()
-    connection.setopt(pycurl.URL, 'https://api.github')
-    print remote_upstream + ' ' + remote_origin
+    connection.setopt(pycurl.URL, 'https://api.github.com/authorizations')
     if remote_upstream in remotes_names and remote_origin in remotes_names:
         username = raw_input('Username: ')
         password = getpass.getpass()
-        print username + ' ' + password
+        connection.setopt(connection.USERPWD, '%s:%s' % (username, password))
+        connection.setopt(connection.POST, 1)
+        connection.setopt(connection.POSTFIELDS, '{"scopes": ["repo"]}')
+        connection.setopt(connection.WRITEFUNCTION, response_buffer.write)
+        connection.perform()
+        connection.close()
+        connection = pycurl.Curl()
+        json_response = simplejson.loads(response_buffer.getvalue())
+        print json_response
+        token = json_response['token']
+        upstream_owner = remote_upstream_instance.url.split('/')[3]
+        repos = remote_upstream_instance.url.split('/')[4].split('.')[0]
+        post_json = {}
+        post_json["title"] = repository.head.get_object().message
+        post_json["body"] = ""
+        post_json["head"] = remote_origin_instance.url.split('/')[3] + ':' + remote_origin_branch
+        post_json["base"] = remote_upstream_base
+        data = simplejson.dumps(post_json)
+        connection.setopt(connection.POST, 1)
+        connection.setopt(connection.WRITEFUNCTION, response_buffer.write)
+        connection.setopt(connection.POSTFIELDS, data)
+        connection.setopt(connection.HTTPHEADER, [str('Authorization: token ' + token)])
+        url = 'https://api.github.com/repos/' + upstream_owner + '/' + repos + '/pulls'
+        print(url)
+        connection.setopt(pycurl.URL, str(url))
+        connection.perform()
+        response = response_buffer.getvalue()
+        print response
