@@ -38,7 +38,6 @@ if __name__ == '__main__':
         connection.close()
         connection = pycurl.Curl()
         json_response = simplejson.loads(response_buffer.getvalue())
-        print json_response
         token = json_response['token']
         upstream_owner = remote_upstream_instance.url.split('/')[3]
         repos = remote_upstream_instance.url.split('/')[4].split('.')[0]
@@ -53,7 +52,6 @@ if __name__ == '__main__':
         connection.setopt(connection.POSTFIELDS, data)
         connection.setopt(connection.HTTPHEADER, [str('Authorization: token ' + token)])
         url = 'https://api.github.com/repos/' + upstream_owner + '/' + repos + '/pulls'
-        print(url)
         connection.setopt(pycurl.URL, str(url))
         connection.perform()
         response = response_buffer.getvalue()
